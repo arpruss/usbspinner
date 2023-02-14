@@ -22,6 +22,17 @@
 #include <Wire.h>
 #endif
 
+inline unsigned angleDistance(unsigned a, unsigned b) {
+  int delta = a-b;
+  if (delta & 0x800) {
+    delta |= ~0xFFF;
+    return -delta;
+  }
+  return delta;
+}
+
+
+
 // prevent redefinitions
 #ifndef AS5601_driver
 #define AS5601_driver
@@ -206,17 +217,6 @@ class AS5601
             return this->readRaw16( AS5601::WordRegister::ANGLE );
         }
 
-        unsigned int angleDistance(unsigned a, unsigned b) {
-          int delta = a-b;
-          if (delta & 0x800) {
-            delta |= ~0xFFF;
-          }
-          if (delta < 0)
-            return -delta;
-          else
-            return delta;
-        }
-
         unsigned int getAngleFiltered()
         {            
             unsigned int angle1 = this->readRaw16( AS5601::WordRegister::ANGLE );
@@ -225,6 +225,23 @@ class AS5601
             if (d12 <= 1)
               return angle2;
             unsigned int angle3 = this->readRaw16( AS5601::WordRegister::ANGLE );
+            unsigned d23 = angleDistance(angle2,angle3);
+            unsigned d13 = angleDistance(angle1,angle3);
+            if (d13 < d12)
+              return angle3;
+            if (d12 < d23)
+              return angle2;
+            return angle3;
+        }
+
+        unsigned int getRawAngleFiltered()
+        {            
+            unsigned int angle1 = this->readRaw16( AS5601::WordRegister::RAWANGLE );
+            unsigned int angle2 = this->readRaw16( AS5601::WordRegister::RAWANGLE );
+            unsigned d12 = angleDistance(angle1,angle2);
+            if (d12 <= 1)
+              return angle2;
+            unsigned int angle3 = this->readRaw16( AS5601::WordRegister::RAWANGLE );
             unsigned d23 = angleDistance(angle2,angle3);
             unsigned d13 = angleDistance(angle1,angle3);
             if (d13 < d12)
