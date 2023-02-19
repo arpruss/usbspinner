@@ -4,23 +4,29 @@
 
 //#define DEBUG
 
+#define VENDOR_ID 0x1EAF
+#define PRODUCT_ID 0xd283
+
 #define RESCALE 1200
 
 #if !defined(RESCALE)
 # define SCALE(x) ((uint32_t)(x))
+# define FULL_ROTATION RESCALE
 #else
 # define SCALE(x) ((uint32_t)(x)*(RESCALE-1)/4095)
+# define FULL_ROTATION 4096
 #endif
 
-unsigned const b1 = PB11;
-unsigned const b2 = PB10;
-unsigned const b3 = PB1;
-unsigned const b4 = PB0;
+unsigned const b2 = PB11;
+unsigned const b1 = PB10;
+unsigned const b4 = PB1;
+unsigned const b3 = PB0;
 Debounce button1(b1, LOW);
 Debounce button2(b2, LOW);
 Debounce button3(b3, LOW);
 Debounce button4(b4, LOW);
 Debounce* buttons[] = { &button1, &button2, &button3, &button4 };
+uint8 mouseButtons[] = {1,2,4,8};
 
 // SDA1: PB7
 // SCL1: PB6
@@ -44,6 +50,7 @@ USBHID HID;
 uint32_t prev = 0xFFFFFFFF;
 const uint32_t LED = PC13;
 
+bool calibrationMode = false;
 const uint32_t mask = 0xFFF;
 const uint32_t signBit = 0x800;
 
@@ -130,6 +137,11 @@ void setup() {
     pinMode(LED, OUTPUT);
     digitalWrite(LED, 1);
     //Serial.begin();
+    
+    USBComposite.setProductString("USB Spinner");
+    USBComposite.setVendorId(VENDOR_ID);
+    USBComposite.setProductId(PRODUCT_ID);  
+    
     HID.setTXInterval(2);
     HID.begin(CompositeSerial);
     while (!USBComposite);
@@ -139,6 +151,7 @@ void setup() {
     while (!CompositeSerial);
     CompositeSerial.println(Sensor.readRaw8(0x07),HEX);
 #endif    
+    calibrationMode = !digitalRead(b3) && !digitalRead(b4);
 }
 
 unsigned count = 0;
@@ -149,7 +162,7 @@ void loop() {
     if (Sensor.magnetDetected()) {
         digitalWrite(LED, 0);
         uint32_t value = SCALE(Sensor.getRawAngleFiltered());
-
+        
 #ifdef DEBUG        
         if (value != exactPrev) {
 //          CompositeSerial.println(value);
@@ -187,14 +200,13 @@ void loop() {
     else {
         digitalWrite(LED, 1);
     }
-    uint8_t mask = 1;
-    for (unsigned i = 0 ; i < sizeof buttons / sizeof *buttons ; i++, mask <<= 1) {
+    for (unsigned i = 0 ; i < sizeof buttons / sizeof *buttons ; i++) {
       switch(buttons[i]->getEvent()) {
         case DEBOUNCE_PRESSED:
-          Mouse.press(mask);
+          Mouse.press(mouseButtons[i]);
           break;
         case DEBOUNCE_RELEASED:
-          Mouse.release(mask);
+          Mouse.release(mouseButtons[i]);
           break;
         default:
           break;
