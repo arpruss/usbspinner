@@ -7,6 +7,16 @@
 #define VENDOR_ID 0x1EAF
 #define PRODUCT_ID 0xd283
 
+// You may not want 4 mouse buttons, and if you don't, then you
+// can make them keyboard buttons. MAME on archive.org supports
+// only 3 mouse buttons, so I'm mapping button 4 to a period.
+#undef KEYBOARD_BUTTON_3
+#define KEYBOARD_BUTTON_4 '.'
+
+#if defined(KEYBOARD_BUTTON_4) || defined(KEYBOARD_BUTTON_3)
+# define KEYBOARD
+#endif
+
 #define RESCALE 1200
 
 #if !defined(RESCALE)
@@ -26,7 +36,23 @@ Debounce button2(b2, LOW);
 Debounce button3(b3, LOW);
 Debounce button4(b4, LOW);
 Debounce* buttons[] = { &button1, &button2, &button3, &button4 };
-uint8 mouseButtons[] = {1,2,4,8};
+struct {
+  bool keyboard;
+  uint16_t code;
+} outputButtons[4] = { 
+  {false,1},
+  {false,2},
+#if defined(KEYBOARD_BUTTON_3)
+  {true,KEYBOARD_BUTTON_3},
+#else    
+  {false,4},
+#endif  
+#if defined(KEYBOARD_BUTTON_4)  
+  {true,KEYBOARD_BUTTON_4},
+#else  
+  {false,8},
+#endif  
+};
 
 // SDA1: PB7
 // SCL1: PB6
@@ -42,11 +68,10 @@ uint8 mouseButtons[] = {1,2,4,8};
  1   2   3   4
 */
 
-
+ 
 AS5601 Sensor;
 USBCompositeSerial CompositeSerial;
 USBHID HID;
-//HIDMouse Mouse(HID); 
 uint32_t prev = 0xFFFFFFFF;
 const uint32_t LED = PC13;
 
@@ -127,7 +152,9 @@ public:
 };
 
 HIDFastMouse Mouse(HID);
-
+#ifdef KEYBOARD
+HIDKeyboard Keyboard(HID);
+#endif
 
 void setup() {
     pinMode(b1, INPUT_PULLUP);
@@ -151,6 +178,9 @@ void setup() {
     while (!CompositeSerial);
     CompositeSerial.println(Sensor.readRaw8(0x07),HEX);
 #endif    
+#ifdef KEYBOARD
+    Keyboard.begin();
+#endif
     calibrationMode = !digitalRead(b3) && !digitalRead(b4);
 }
 
@@ -162,6 +192,8 @@ void loop() {
     if (Sensor.magnetDetected()) {
         digitalWrite(LED, 0);
         uint32_t value = SCALE(Sensor.getRawAngleFiltered());
+        //if (calibrationMode) 
+        //  value = value * 4 / FULL_ROTATION * FULL_ROTATION/4;
         
 #ifdef DEBUG        
         if (value != exactPrev) {
@@ -202,12 +234,28 @@ void loop() {
     }
     for (unsigned i = 0 ; i < sizeof buttons / sizeof *buttons ; i++) {
       switch(buttons[i]->getEvent()) {
+#ifdef KEYBOARD
+        case DEBOUNCE_PRESSED:
+          if (outputButtons[i].keyboard)
+            Keyboard.press(outputButtons[i].code);
+          else
+            Mouse.press(outputButtons[i].code);
+          break;
+        case DEBOUNCE_RELEASED:
+          if (outputButtons[i].keyboard)
+            Keyboard.release(outputButtons[i].code);
+          else
+            Mouse.release(outputButtons[i].code);
+          break;
+          break;
+#else
         case DEBOUNCE_PRESSED:
           Mouse.press(mouseButtons[i]);
           break;
         case DEBOUNCE_RELEASED:
           Mouse.release(mouseButtons[i]);
           break;
+#endif          
         default:
           break;
       }
