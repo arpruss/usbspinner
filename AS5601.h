@@ -13,14 +13,7 @@
 
 // include these dependencies in your top-level .ino!
 #include <Arduino.h>
-//#define SOFT
-
-#ifdef SOFT
-#include <SoftWire.h>
-#define TwoWire SoftWire
-#else
 #include <Wire.h>
-#endif
 
 inline unsigned angleDistance(unsigned a, unsigned b) {
   int delta = a-b;
@@ -37,11 +30,6 @@ inline unsigned angleDistance(unsigned a, unsigned b) {
 #ifndef AS5601_driver
 #define AS5601_driver
 
-#ifdef SOFT
-SoftWire wire(PB6, PB7, SOFT_STANDARD);
-#else
-TwoWire wire(1,0); // SCL2=PB10, SDA2=PB11
-#endif
 
 class AS5601
 {
@@ -74,22 +62,13 @@ class AS5601
             MAGNITUDE = 0x1B;
         } WordRegister;
 
-        // initialization
-        AS5601()
-        {
-            // host I2C bus as master in the default I2C channel
-            wireChannel = &wire;
-            wireChannel->begin();
-        }
-
         // initialization with explicit I2C channel
-        AS5601(TwoWire *i2cChannel)
+        // must call begin() on the channel before using
+        AS5601(WireBase *i2cChannel)
         {
             // host I2C bus as master in the passed channel
             wireChannel = i2cChannel;
-            wireChannel->begin();
         }
-
 
         /* :: Low-Level Access :: */
 
@@ -252,8 +231,7 @@ class AS5601
         }
 
     private:
-
-        TwoWire *wireChannel;
+        WireBase *wireChannel;
 };
 
 

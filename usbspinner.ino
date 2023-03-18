@@ -1,12 +1,15 @@
 #include "AS5601.h"
 #include "debounce.h"
 #include <USBComposite.h>
+#include <Wire.h>
+
+TwoWire wire_AS5601(1,0); // SCL2=PB10, SDA2=PB11
 
 #define NUNCHUCK
 
 #ifdef NUNCHUCK
 #include <GameControllers.h>
-NunchuckController nunchuck(PB8,PB9); // SCL1=PB8, SDA1=PB9
+NunchuckController_SoftWire nunchuck(PB8,PB9,SOFT_STANDARD); // SCL1=PB8, SDA1=PB9
 #endif
 
 //#define DEBUG
@@ -80,7 +83,7 @@ uint8_t keyboardState[256];
 */
 
  
-AS5601 Sensor;
+AS5601 Sensor(&wire_AS5601);
 USBCompositeSerial CompositeSerial;
 USBHID HID;
 uint32_t prev = 0xFFFFFFFF;
@@ -175,6 +178,8 @@ void setup() {
     pinMode(LED, OUTPUT);
     digitalWrite(LED, 1);
     //Serial.begin();
+
+    wire_AS5601.begin();
     
     USBComposite.setProductString("USB Spinner");
     USBComposite.setVendorId(VENDOR_ID);
@@ -197,15 +202,6 @@ void setup() {
     haveNunchuck = nunchuck.begin();
 #endif
     calibrationMode = !digitalRead(b3) && !digitalRead(b4);
-
-/*    pinMode(PB8,INPUT);
-    pinMode(PB9,INPUT);
-    while(1) {
-      digitalWrite(LED,!digitalRead(PB8));
-      delay(1000);
-      digitalWrite(LED,!digitalRead(PB9));
-      delay(1000);
-    }*/
 }
 
 unsigned count = 0;
