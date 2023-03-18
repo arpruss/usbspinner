@@ -2,10 +2,18 @@
 #include "debounce.h"
 #include <USBComposite.h>
 
+#define NUNCHUCK
+
+#ifdef NUNCHUCK
+#include <GameControllers.h>
+NunchuckController nunchuck(PB8,PB9); // SCL1=PB8, SDA1=PB9
+#endif
+
 //#define DEBUG
 
 #define VENDOR_ID 0x1EAF
 #define PRODUCT_ID 0xd283
+
 
 // You may not want 4 mouse buttons, and if you don't, then you
 // can make them keyboard buttons. MAME on archive.org supports
@@ -27,6 +35,7 @@
 # define FULL_ROTATION 4096
 #endif
 
+bool haveNunchuck = false;
 unsigned const b2 = PB11;
 unsigned const b1 = PB10;
 unsigned const b4 = PB1;
@@ -53,6 +62,8 @@ struct {
   {false,8},
 #endif  
 };
+
+uint8_t keyboardState[256];
 
 // SDA1: PB7
 // SCL1: PB6
@@ -181,12 +192,39 @@ void setup() {
 #ifdef KEYBOARD
     Keyboard.begin();
 #endif
+    
+#ifdef NUNCHUCK
+    haveNunchuck = nunchuck.begin();
+#endif
     calibrationMode = !digitalRead(b3) && !digitalRead(b4);
+
+/*    pinMode(PB8,INPUT);
+    pinMode(PB9,INPUT);
+    while(1) {
+      digitalWrite(LED,!digitalRead(PB8));
+      delay(1000);
+      digitalWrite(LED,!digitalRead(PB9));
+      delay(1000);
+    }*/
 }
 
 unsigned count = 0;
 unsigned exactPrev = 0xFFFFFFFF;
 unsigned lastZeroCross = 0;
+
+void keyboardPress(uint8_t k) {
+  if (keyboardState[k])
+    return;
+  Keyboard.press(k);
+  keyboardState[k] = 1;
+}
+
+void keyboardRelease(uint8_t k) {
+  if (!keyboardState[k])
+    return;
+  Keyboard.release(k);
+  keyboardState[k] = 0;
+}
 
 void loop() {    
     if (Sensor.magnetDetected()) {
@@ -237,13 +275,13 @@ void loop() {
 #ifdef KEYBOARD
         case DEBOUNCE_PRESSED:
           if (outputButtons[i].keyboard)
-            Keyboard.press(outputButtons[i].code);
+            keyboardPress(outputButtons[i].code);
           else
             Mouse.press(outputButtons[i].code);
           break;
         case DEBOUNCE_RELEASED:
           if (outputButtons[i].keyboard)
-            Keyboard.release(outputButtons[i].code);
+            keyboardRelease(outputButtons[i].code);
           else
             Mouse.release(outputButtons[i].code);
           break;
@@ -260,4 +298,47 @@ void loop() {
           break;
       }
     }
+
+#ifdef NUNCHUCK
+    GameControllerData_t data;
+    if (haveNunchuck && nunchuck.read(&data)) {
+      if (data.joystickX < 256) {
+        keyboardPress(KEY_LEFT_ARROW);
+      }
+      else {
+        keyboardRelease(KEY_LEFT_ARROW);
+      }
+      if (data.joystickX > 767) {
+        keyboardPress(KEY_RIGHT_ARROW);
+      }
+      else {
+        keyboardRelease(KEY_RIGHT_ARROW);
+      }
+      if (data.joystickY < 256) {
+        keyboardPress(KEY_UP_ARROW);
+      }
+      else {
+        keyboardRelease(KEY_UP_ARROW);
+      }
+      if (data.joystickY > 767) {
+        keyboardPress(KEY_DOWN_ARROW);
+      }
+      else {
+        keyboardRelease(KEY_DOWN_ARROW);
+      }
+      if (data.buttons & 1) {
+        keyboardPress(KEY_LEFT_CTRL);
+      }
+      else {
+        keyboardRelease(KEY_LEFT_CTRL);
+      }
+      if (data.buttons & 2) {
+        keyboardPress(KEY_LEFT_ALT);
+      }
+      else {
+        keyboardRelease(KEY_LEFT_ALT);
+      }
+    }
+#endif
 }
+

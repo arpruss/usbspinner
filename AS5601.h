@@ -40,7 +40,7 @@ inline unsigned angleDistance(unsigned a, unsigned b) {
 #ifdef SOFT
 SoftWire wire(PB6, PB7, SOFT_STANDARD);
 #else
-TwoWire wire(1,0);
+TwoWire wire(1,0); // SCL2=PB10, SDA2=PB11
 #endif
 
 class AS5601
