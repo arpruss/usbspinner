@@ -3,13 +3,14 @@
 #include <USBComposite.h>
 #include <Wire.h>
 
-TwoWire wire_AS5601(1,0); // SCL2=PB10, SDA2=PB11
+TwoWire wire_AS5601(1,0); // SCL1=PB6, SDA1=PB7
 
 #define NUNCHUCK
 
 #ifdef NUNCHUCK
 #include <GameControllers.h>
-NunchuckController_SoftWire nunchuck(PB8,PB9,SOFT_STANDARD); // SCL1=PB8, SDA1=PB9
+//NunchuckController_SoftWire nunchuck(PB10,PB11,SOFT_STANDARD); // SCL2=PB10, SDA2=PB11
+NunchuckController nunchuck(2,0); // SCL2=PB10, SDA2=PB11
 #endif
 
 //#define DEBUG
@@ -39,8 +40,8 @@ NunchuckController_SoftWire nunchuck(PB8,PB9,SOFT_STANDARD); // SCL1=PB8, SDA1=P
 #endif
 
 bool haveNunchuck = false;
-unsigned const b2 = PB11;
-unsigned const b1 = PB10;
+unsigned const b2 = PA7;
+unsigned const b1 = PA6;
 unsigned const b4 = PB1;
 unsigned const b3 = PB0;
 Debounce button1(b1, LOW);
