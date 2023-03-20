@@ -33,10 +33,10 @@ NunchuckController nunchuck(2,0); // SCL2=PB10, SDA2=PB11
 
 #if !defined(RESCALE)
 # define SCALE(x) ((uint32_t)(x))
-# define FULL_ROTATION RESCALE
+# define FULL_ROTATION 4096
 #else
 # define SCALE(x) ((uint32_t)(x)*(RESCALE-1)/4095)
-# define FULL_ROTATION 4096
+# define FULL_ROTATION RESCALE
 #endif
 
 bool haveNunchuck = false;
@@ -176,8 +176,12 @@ void setup() {
     pinMode(b2, INPUT_PULLUP);
     pinMode(b3, INPUT_PULLUP);
     pinMode(b4, INPUT_PULLUP);
+    
+    calibrationMode = !digitalRead(b4);
+    while(!digitalRead(b4)) ;
+
     pinMode(LED, OUTPUT);
-    digitalWrite(LED, 1);
+    digitalWrite(LED, 0);
     //Serial.begin();
 
     wire_AS5601.begin();
@@ -202,7 +206,6 @@ void setup() {
 #ifdef NUNCHUCK
     haveNunchuck = nunchuck.begin();
 #endif
-    calibrationMode = !digitalRead(b3) && !digitalRead(b4);
 }
 
 unsigned count = 0;
@@ -227,8 +230,8 @@ void loop() {
     if (Sensor.magnetDetected()) {
         digitalWrite(LED, 0);
         uint32_t value = SCALE(Sensor.getRawAngleFiltered());
-        //if (calibrationMode) 
-        //  value = value * 4 / FULL_ROTATION * FULL_ROTATION/4;
+        if (calibrationMode) 
+          value = value / ( FULL_ROTATION / 4) * (FULL_ROTATION / 4);
         
 #ifdef DEBUG        
         if (value != exactPrev) {
@@ -271,6 +274,8 @@ void loop() {
       switch(buttons[i]->getEvent()) {
 #ifdef KEYBOARD
         case DEBOUNCE_PRESSED:
+          if (calibrationMode && i == 3)
+            calibrationMode = false;
           if (outputButtons[i].keyboard)
             keyboardPress(outputButtons[i].code);
           else
@@ -285,6 +290,8 @@ void loop() {
           break;
 #else
         case DEBOUNCE_PRESSED:
+          if (calibrationMode && i == 3)
+            calibrationMode = false;
           Mouse.press(mouseButtons[i]);
           break;
         case DEBOUNCE_RELEASED:
