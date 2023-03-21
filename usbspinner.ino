@@ -13,8 +13,6 @@ TwoWire wire_AS5601(1,0); // SCL1=PB6, SDA1=PB7
 NunchuckController nunchuck(2,0); // SCL2=PB10, SDA2=PB11
 #endif
 
-//#define DEBUG
-
 #define VENDOR_ID 0x1EAF
 #define PRODUCT_ID 0xd283
 
@@ -38,6 +36,12 @@ NunchuckController nunchuck(2,0); // SCL2=PB10, SDA2=PB11
 # define SCALE(x) ((uint32_t)(x)*(RESCALE-1)/4095)
 # define FULL_ROTATION RESCALE
 #endif
+
+enum {
+  MOUSE = 0,
+  MOUSE_CALIBRATION,
+  STELLA_DRIVING
+} mode;
 
 bool haveNunchuck = false;
 unsigned const b2 = PA7;
@@ -85,12 +89,10 @@ uint8_t keyboardState[256];
 
  
 AS5601 Sensor(&wire_AS5601);
-USBCompositeSerial CompositeSerial;
 USBHID HID;
 uint32_t prev = 0xFFFFFFFF;
 const uint32_t LED = PC13;
 
-bool calibrationMode = false;
 const uint32_t mask = 0xFFF;
 const uint32_t signBit = 0x800;
 
@@ -131,7 +133,10 @@ struct FastMouseReport_t {
     int32_t dy:12;
 } __packed;
 
-uint8_t fastMouseDescriptor[] = {HID_FAST_MOUSE_REPORT_DESCRIPTOR(HID_MOUSE_REPORT_ID)};
+uint8_t fastMouseDescriptor[] = {
+  HID_FAST_MOUSE_REPORT_DESCRIPTOR(HID_MOUSE_REPORT_ID),
+//  HID_KEYBOARD_REPORT_DESCRIPTOR() 
+  };
 
 HIDReportDescriptor fastMouse = {
   fastMouseDescriptor, sizeof(fastMouseDescriptor)
@@ -176,29 +181,40 @@ void setup() {
     pinMode(b2, INPUT_PULLUP);
     pinMode(b3, INPUT_PULLUP);
     pinMode(b4, INPUT_PULLUP);
-    
-    calibrationMode = !digitalRead(b4);
-    while(!digitalRead(b4)) ;
+
+    mode = MOUSE;
+    if (!digitalRead(b4)) {
+      mode = MOUSE_CALIBRATION;
+      while(!digitalRead(b4)) ;
+    }
+    else if (!digitalRead(b3)) {
+      mode = STELLA_DRIVING;
+      while(!digitalRead(b3)) ;
+    }
 
     pinMode(LED, OUTPUT);
-    digitalWrite(LED, 0);
-    //Serial.begin();
+    digitalWrite(LED, 1);
 
     wire_AS5601.begin();
+
+    if (mode == STELLA_DRIVING) {
+      stella_driving_setup();      
+      return;
+    }
     
     USBComposite.setProductString("USB Spinner");
     USBComposite.setVendorId(VENDOR_ID);
     USBComposite.setProductId(PRODUCT_ID);  
-    
+
+    //HID.clear();
     HID.setTXInterval(2);
-    HID.begin(CompositeSerial);
+    Mouse.registerProfile();
+#ifdef KEYBOARD
+    Keyboard.registerProfile();
+#endif    
+    HID.begin();
     while (!USBComposite);
     //Sensor.writeRaw8(0x07,0); // 0b11011); // Fast Filter 110, Slow Filter 11
-#ifdef DEBUG    
-    delay(2000);
-    while (!CompositeSerial);
-    CompositeSerial.println(Sensor.readRaw8(0x07),HEX);
-#endif    
 #ifdef KEYBOARD
     Keyboard.begin();
 #endif
@@ -226,27 +242,17 @@ void keyboardRelease(uint8_t k) {
   keyboardState[k] = 0;
 }
 
-void loop() {    
+void loop() {
+    if (mode == STELLA_DRIVING) {
+      stella_driving_loop();
+      return;
+    }
+    
     if (Sensor.magnetDetected()) {
         digitalWrite(LED, 0);
         uint32_t value = SCALE(Sensor.getRawAngleFiltered());
-        if (calibrationMode) 
+        if (mode == MOUSE_CALIBRATION) 
           value = value / ( FULL_ROTATION / 4) * (FULL_ROTATION / 4);
-        
-#ifdef DEBUG        
-        if (value != exactPrev) {
-//          CompositeSerial.println(value);
-          if ((exactPrev & signBit) && !(value & signBit)) {
-            uint32_t dt = millis()-lastZeroCross;
-            if (dt != 0) {
-              CompositeSerial.print("rpm:");
-              CompositeSerial.println(60000/dt);
-            }
-            lastZeroCross=millis();
-          }          
-          exactPrev = value;
-        }
-#endif        
 
         if (prev == 0xFFFFFFFF) {
           prev = value;
@@ -274,8 +280,8 @@ void loop() {
       switch(buttons[i]->getEvent()) {
 #ifdef KEYBOARD
         case DEBOUNCE_PRESSED:
-          if (calibrationMode && i == 3)
-            calibrationMode = false;
+          if (mode == MOUSE_CALIBRATION && i == 3)
+            mode = MOUSE;
           if (outputButtons[i].keyboard)
             keyboardPress(outputButtons[i].code);
           else
@@ -290,8 +296,8 @@ void loop() {
           break;
 #else
         case DEBOUNCE_PRESSED:
-          if (calibrationMode && i == 3)
-            calibrationMode = false;
+          if (mode == MOUSE_CALIBRATION && i == 3)
+            mode = MOUSE;
           Mouse.press(mouseButtons[i]);
           break;
         case DEBOUNCE_RELEASED:
