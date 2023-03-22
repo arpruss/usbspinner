@@ -85,7 +85,7 @@ void stella_driving_loop() {
     
     if (Sensor.magnetDetected()) {
         digitalWrite(LED, 0);
-        uint32_t value = Sensor.getRawAngleFiltered();
+        uint32_t value = Sensor.getRawAngle();
         if (startAngle == -1) {
           startAngle = value;
           force = true;

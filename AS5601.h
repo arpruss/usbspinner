@@ -93,6 +93,27 @@ class AS5601
             return wireChannel->read();
         }
 
+        uint32_t readRaw16Atomic( unsigned char registerAddress )
+        {
+            // send START for I2C frame to the AS5601
+            wireChannel->beginTransmission( this->address );
+
+            // send register address
+            wireChannel->write( registerAddress );
+
+            // flush, but do not release bus (no STOP)
+            wireChannel->endTransmission( false );
+
+            // request one byte as response from the AS5601, release and wait
+            // (casting is necessary due to similar declarations of .requestFrom)
+            wireChannel->requestFrom( (uint8_t) this->address, (uint8_t) 2, (uint8_t) true );
+
+            // return response
+            uint8_t high = wireChannel->read();
+            uint8_t low = wireChannel->read();
+            return word(high,low);
+        }
+
         // low-level: read two bytes as 16-bit word from two 8-bit registers
         unsigned int readRaw16( unsigned char registerStartAddress )
         {
@@ -103,7 +124,6 @@ class AS5601
             // combine to 16-bit word
             return word( highByte, lowByte );
         }
-
 
         // low-level: write one byte to an 8-bit register
         void writeRaw8( unsigned char registerAddress, unsigned char value )
@@ -146,7 +166,7 @@ class AS5601
         unsigned int getMagnitude()
         {
             // read and return two-byte magnitude
-            return this->readRaw16( AS5601::WordRegister::MAGNITUDE );
+            return this->readRaw16Atomic( AS5601::WordRegister::MAGNITUDE );
         }
 
         // get current gain of AGC (8 bit)
@@ -160,7 +180,7 @@ class AS5601
         unsigned int getRawAngle()
         {
             // read and return two-byte raw angle
-            return this->readRaw16( AS5601::WordRegister::RAWANGLE );
+            return this->readRaw16Atomic( AS5601::WordRegister::RAWANGLE );
         }
 
         // set zero-position to specified raw angle (12 bit)
@@ -193,17 +213,17 @@ class AS5601
         unsigned int getAngle()
         {
             // read and return two-byte clean angle
-            return this->readRaw16( AS5601::WordRegister::ANGLE );
+            return this->readRaw16Atomic( AS5601::WordRegister::ANGLE );
         }
 
         unsigned int getAngleFiltered()
         {            
-            unsigned int angle1 = this->readRaw16( AS5601::WordRegister::ANGLE );
-            unsigned int angle2 = this->readRaw16( AS5601::WordRegister::ANGLE );
+            unsigned int angle1 = this->readRaw16Atomic( AS5601::WordRegister::ANGLE );
+            unsigned int angle2 = this->readRaw16Atomic( AS5601::WordRegister::ANGLE );
             unsigned d12 = angleDistance(angle1,angle2);
             if (d12 <= 1)
               return angle2;
-            unsigned int angle3 = this->readRaw16( AS5601::WordRegister::ANGLE );
+            unsigned int angle3 = this->readRaw16Atomic( AS5601::WordRegister::ANGLE );
             unsigned d23 = angleDistance(angle2,angle3);
             unsigned d13 = angleDistance(angle1,angle3);
             if (d13 < d12)
@@ -215,12 +235,12 @@ class AS5601
 
         unsigned int getRawAngleFiltered()
         {            
-            unsigned int angle1 = this->readRaw16( AS5601::WordRegister::RAWANGLE );
-            unsigned int angle2 = this->readRaw16( AS5601::WordRegister::RAWANGLE );
+            unsigned int angle1 = this->readRaw16Atomic( AS5601::WordRegister::RAWANGLE );
+            unsigned int angle2 = this->readRaw16Atomic( AS5601::WordRegister::RAWANGLE );
             unsigned d12 = angleDistance(angle1,angle2);
             if (d12 <= 1)
               return angle2;
-            unsigned int angle3 = this->readRaw16( AS5601::WordRegister::RAWANGLE );
+            unsigned int angle3 = this->readRaw16Atomic( AS5601::WordRegister::RAWANGLE );
             unsigned d23 = angleDistance(angle2,angle3);
             unsigned d13 = angleDistance(angle1,angle3);
             if (d13 < d12)

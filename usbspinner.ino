@@ -3,7 +3,12 @@
 #include <USBComposite.h>
 #include <Wire.h>
 
-TwoWire wire_AS5601(1,0); // SCL1=PB6, SDA1=PB7
+#include <SoftWire.h>
+
+//TwoWire wire_AS5601(1,0); // SCL1=PB6, SDA1=PB7
+SoftWire wire_AS5601(PB6,PB7);
+
+//USBCompositeSerial CompositeSerial;
 
 #define NUNCHUCK
 
@@ -206,13 +211,15 @@ void setup() {
     USBComposite.setVendorId(VENDOR_ID);
     USBComposite.setProductId(PRODUCT_ID);  
 
-    //HID.clear();
+    HID.clear();
     HID.setTXInterval(2);
     Mouse.registerProfile();
 #ifdef KEYBOARD
     Keyboard.registerProfile();
 #endif    
-    HID.begin();
+    HID.registerComponent();
+    //CompositeSerial.registerComponent();
+    USBComposite.begin();
     while (!USBComposite);
     //Sensor.writeRaw8(0x07,0); // 0b11011); // Fast Filter 110, Slow Filter 11
 #ifdef KEYBOARD
@@ -250,7 +257,7 @@ void loop() {
     
     if (Sensor.magnetDetected()) {
         digitalWrite(LED, 0);
-        uint32_t value = SCALE(Sensor.getRawAngleFiltered());
+        uint32_t value = SCALE(Sensor.getRawAngle());
         if (mode == MOUSE_CALIBRATION) 
           value = value / ( FULL_ROTATION / 4) * (FULL_ROTATION / 4);
 
