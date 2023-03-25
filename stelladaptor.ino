@@ -1,6 +1,12 @@
 #define STELLA_PRODUCT_ID 0xBEEF
 #define STELLA_MFG_ID 0x04D8
 
+const uint8_t gray[] = { 0b00, 0b01, 0b11, 0b10 };
+
+#define TEN_BIT
+
+#ifndef TEN_BIT
+#define AXIS_MULT 1
 const uint8_t stellaReportDescriptor[] = {
     0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
     0x15, 0x00,                    // LOGICAL_MINIMUM (0)
@@ -34,12 +40,54 @@ const uint8_t stellaReportDescriptor[] = {
     0x81, 0x03,                    //   INPUT (Cnst,Var,Abs)
     0xc0                           // END_COLLECTION
 };
+#else
+#define AXIS_MULT 4
+uint8 stellaReportDescriptor[] = {
+  0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+  0x15, 0x00,                    // LOGICAL_MINIMUM (0)
+  0x09, 0x04,                    // USAGE (Joystick)
+  0xa1, 0x01,                    // COLLECTION (Application)
+  0x85, 1,                       /*    REPORT_ID */ // not present in official Stelladaptor
+  0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
+  0x26, 0xff, 0x03,              //   LOGICAL_MAXIMUM (1023) // 255 for official Stelladaptor
+  0x75, 0x0A,                    //   REPORT_SIZE (10) // 8 for official Stelladaptor
+  //0x95, 0x01,                    //   REPORT_COUNT (1) /* byte 0 unused */ // official Stelladaptor
+  //0x81, 0x03,                    //   INPUT (Cnst,Var,Abs)  // official Stelladaptor
+  0x05, 0x01,                    //   USAGE_PAGE (Generic Desktop)
+  0x09, 0x01,                    //   USAGE (Pointer)
+  0xa1, 0x00,                    //   COLLECTION (Physical)
+  0x09, 0x30,                    //     USAGE (X)
+  0x09, 0x31,                    //     USAGE (Y)
+  0x95, 0x02,                    //     REPORT_COUNT (2)
+  0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+  0xc0,                          //     END_COLLECTION
+  0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
+  0x25, 0x01,                    //   LOGICAL_MAXIMUM (1)
+  0x05, 0x09,                    //   USAGE_PAGE (Button)
+  0x19, 0x01,                    //   USAGE_MINIMUM (Button 1)
+  0x29, 0x04,                    //   USAGE_MAXIMUM (Button 4)
+  0x55, 0x00,                    //   UNIT_EXPONENT (0)
+  0x65, 0x00,                    //   UNIT (None)
+  0x75, 0x01,                    //   REPORT_SIZE (1)
+  0x95, 0x04,                    //   REPORT_COUNT (2)
+  0x81, 0x02,                    //   INPUT (Data,Var,Abs)
+  0xc0                           // END_COLLECTION
+};
+#endif
 
 HIDReportDescriptor stellaDescriptor = {
   stellaReportDescriptor,
   sizeof(stellaReportDescriptor)
 };
 
+#ifdef TEN_BIT
+typedef struct {
+  uint8_t reportID;
+  unsigned x: 10;
+  unsigned y: 10;
+  uint8_t buttons: 4;
+} __packed StellaReport_t;
+#else
 typedef struct {
   uint8_t _reportID;
   uint8_t unused;
@@ -48,6 +96,7 @@ typedef struct {
   uint8_t buttons: 4;
   uint8_t padding: 4;
 } __packed StellaReport_t;
+#endif
 
 class HIDStella : public HIDReporter {
   public:
@@ -76,9 +125,6 @@ void stella_driving_setup() {
 }
 
 void stella_driving_loop() {
-//    joy1.joyReport.button1 = 1;
-//    joy1.sendReport();
-#if 1
     static int startAngle = -1;
     bool force = false;
     StellaReport_t oldReport = DrivingController.report;
@@ -94,35 +140,22 @@ void stella_driving_loop() {
           force = false;
         }
         value = ( (value - startAngle + 4096) % 4096 );
-        uint8_t pos = value / (4096/16);
-        uint8_t up = pos & 8;
-        uint8_t down = pos & 4;
-        uint8_t left = pos & 2;
-        uint8_t right = pos & 1;
+        uint8_t grayCode = gray[ (value / (4096/16)) % 4 ];
+        uint8_t up = grayCode & 2;
+        uint8_t down = grayCode & 1;
         if (up && down) {
-          DrivingController.report.y = 0xC0;
+          DrivingController.report.y = 0xC0*AXIS_MULT;
         }
         else if (up) {
           DrivingController.report.y = 0;
         }
         else if (down) {
-          DrivingController.report.y = 0xFF;
+          DrivingController.report.y = 0x100 * AXIS_MULT - 1;
         }
         else {
-          DrivingController.report.y = 0x7F;
+          DrivingController.report.y = 0x80 * AXIS_MULT;
         }
-        if (left && right) {
-          DrivingController.report.x = 0xC0;
-        }
-        else if (right) {
-          DrivingController.report.x = 0xFF;
-        }
-        else if (left) {
-          DrivingController.report.x = 0;
-        }
-        else {
-          DrivingController.report.x = 0x7F;
-        }
+        DrivingController.report.x = 0x80 * AXIS_MULT;
     }
 
       for (unsigned i = 0 ; i < 4 ; i++) {
@@ -139,6 +172,5 @@ void stella_driving_loop() {
       if (force || memcmp(&DrivingController.report,&oldReport,sizeof(DrivingController.report))) {
         DrivingController.sendReport();
       }
-#endif      
 }
 
