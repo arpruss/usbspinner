@@ -3,7 +3,7 @@
 
 const uint8_t gray[] = { 0b00, 0b01, 0b11, 0b10 };
 
-#define TEN_BIT
+//#define TEN_BIT
 
 #ifndef TEN_BIT
 #define AXIS_MULT 1
@@ -107,7 +107,7 @@ class HIDStella : public HIDReporter {
 };
 
 HIDStella DrivingController(HID);
-
+USBCompositeSerial CompositeSerial;
 
 
 void stella_driving_setup() {
@@ -119,7 +119,7 @@ void stella_driving_setup() {
     HID.clear();
     HID.setTXInterval(2);
     DrivingController.registerProfile();
-    HID.begin();
+    HID.begin(CompositeSerial);
     
     while (!USBComposite);
 }
@@ -153,9 +153,9 @@ void stella_driving_loop() {
           DrivingController.report.y = 0x100 * AXIS_MULT - 1;
         }
         else {
-          DrivingController.report.y = 0x80 * AXIS_MULT;
+          DrivingController.report.y = 0x80 * AXIS_MULT - 1;
         }
-        DrivingController.report.x = 0x80 * AXIS_MULT;
+        DrivingController.report.x = 0x80 * AXIS_MULT - 1;
     }
 
       for (unsigned i = 0 ; i < 4 ; i++) {
@@ -170,7 +170,8 @@ void stella_driving_loop() {
       }
 
       if (force || memcmp(&DrivingController.report,&oldReport,sizeof(DrivingController.report))) {
-        DrivingController.sendReport();
+        CompositeSerial.println(DrivingController.report.y);
       }
+      DrivingController.sendReport();
 }
 
