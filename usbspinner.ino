@@ -1,12 +1,12 @@
-#include "AS5601.h"
+#include "AS560x.h"
 #include "debounce.h"
 #include <USBComposite.h>
 #include <Wire.h>
 
 #include <SoftWire.h>
 
-//TwoWire wire_AS5601(1,0); // SCL1=PB6, SDA1=PB7
-SoftWire wire_AS5601(PB6,PB7);
+//TwoWire wire_AS560x(1,0); // SCL1=PB6, SDA1=PB7
+SoftWire wire_AS560x(PB6,PB7);
 
 //USBCompositeSerial CompositeSerial;
 
@@ -85,7 +85,7 @@ uint8_t keyboardState[256];
  8   7   6   5
  A  SCL SDA  B 
  +------------+
- |  AS5601    |
+ |  AS560x    |
  |o           |
  +------------+
 5V 3V3 PUSH GND
@@ -93,7 +93,7 @@ uint8_t keyboardState[256];
 */
 
  
-AS5601 Sensor(&wire_AS5601);
+AS560x Sensor(&wire_AS560x);
 USBHID HID;
 uint32_t prev = 0xFFFFFFFF;
 const uint32_t LED = PC13;
@@ -200,7 +200,7 @@ void setup() {
     pinMode(LED, OUTPUT);
     digitalWrite(LED, 1);
 
-    wire_AS5601.begin();
+    wire_AS560x.begin();
 
     if (mode == STELLA_DRIVING) {
       stella_driving_setup();      
