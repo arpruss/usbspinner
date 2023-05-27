@@ -107,7 +107,6 @@ class HIDStella : public HIDReporter {
 };
 
 HIDStella DrivingController(HID);
-USBCompositeSerial CompositeSerial;
 
 
 void stella_driving_setup() {
@@ -119,7 +118,7 @@ void stella_driving_setup() {
     HID.clear();
     HID.setTXInterval(2);
     DrivingController.registerProfile();
-    HID.begin(CompositeSerial);
+    HID.begin();
     
     while (!USBComposite);
 }
@@ -169,9 +168,6 @@ void stella_driving_loop() {
         }
       }
 
-      if (force || memcmp(&DrivingController.report,&oldReport,sizeof(DrivingController.report))) {
-        CompositeSerial.println(DrivingController.report.y);
-      }
       DrivingController.sendReport();
 }
 

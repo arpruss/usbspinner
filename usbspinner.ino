@@ -1,16 +1,14 @@
-#include "AS560x.h"
 #include "debounce.h"
 #include <USBComposite.h>
 #include <Wire.h>
+#include "AS560x.h"
 
 #include <SoftWire.h>
 
 //TwoWire wire_AS560x(1,0); // SCL1=PB6, SDA1=PB7
 SoftWire wire_AS560x(PB6,PB7);
 
-//USBCompositeSerial CompositeSerial;
-
-#define NUNCHUCK
+//#define NUNCHUCK
 
 #ifdef NUNCHUCK
 #include <GameControllers.h>
@@ -200,10 +198,9 @@ void setup() {
     pinMode(LED, OUTPUT);
     digitalWrite(LED, 1);
 
-    wire_AS560x.begin();
-
     if (mode == STELLA_DRIVING) {
       stella_driving_setup();      
+      digitalWrite(LED, 0);
       return;
     }
     
@@ -218,9 +215,10 @@ void setup() {
     Keyboard.registerProfile();
 #endif    
     HID.registerComponent();
-    //CompositeSerial.registerComponent();
-    USBComposite.begin();
+    HID.begin();
     while (!USBComposite);
+    wire_AS560x.begin();
+
     //Sensor.writeRaw8(0x07,0); // 0b11011); // Fast Filter 110, Slow Filter 11
 #ifdef KEYBOARD
     Keyboard.begin();
@@ -254,7 +252,7 @@ void loop() {
       stella_driving_loop();
       return;
     }
-    
+
     if (Sensor.magnetDetected()) {
         digitalWrite(LED, 0);
         uint32_t value = SCALE(Sensor.getRawAngle());
@@ -283,6 +281,7 @@ void loop() {
     else {
         digitalWrite(LED, 1);
     }
+
     for (unsigned i = 0 ; i < sizeof buttons / sizeof *buttons ; i++) {
       switch(buttons[i]->getEvent()) {
 #ifdef KEYBOARD
